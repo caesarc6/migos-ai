@@ -1,7 +1,16 @@
 import { StageIllustration } from "@/components/stage-illustration";
+import { TemplateUpload } from "@/components/template-upload";
 import { TEMPLATE_ASSET_PATH, TEMPLATE_PUBLIC_URL } from "@/lib/template-path";
 
-export function TemplateStage({ hasTemplateVideo }: { hasTemplateVideo: boolean }) {
+export function TemplateStage({
+  hasTemplateVideo,
+  templateVersion,
+}: {
+  hasTemplateVideo: boolean;
+  templateVersion: string | null;
+}) {
+  const src = templateVersion ? `${TEMPLATE_PUBLIC_URL}?v=${templateVersion}` : TEMPLATE_PUBLIC_URL;
+
   return (
     <section aria-label="Template performance" className="mt-10">
       <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
@@ -11,7 +20,8 @@ export function TemplateStage({ hasTemplateVideo }: { hasTemplateVideo: boolean 
       <div className="overflow-hidden rounded-2xl border border-border bg-card">
         {hasTemplateVideo ? (
           <video
-            src={TEMPLATE_PUBLIC_URL}
+            key={src}
+            src={src}
             controls
             playsInline
             className="aspect-video w-full bg-black"
@@ -33,12 +43,13 @@ export function TemplateStage({ hasTemplateVideo }: { hasTemplateVideo: boolean 
             <>
               <p className="font-display text-xl tracking-tight">The source clip will appear here.</p>
               <p className="mt-1 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-                Drop the master performance at <code className="text-foreground">{TEMPLATE_ASSET_PATH}</code> and
-                this slot plays the two artists rapping and dancing. Until that file is in the project, the
-                stage above stands in for them.
+                Add an MP4 on this page. MIGO saves it as{" "}
+                <code className="text-foreground">{TEMPLATE_ASSET_PATH}</code> and plays the two artists
+                rapping and dancing. Until that file is in the project, the stage above stands in for them.
               </p>
             </>
           )}
+          <TemplateUpload hasVideo={hasTemplateVideo} />
         </div>
       </div>
     </section>

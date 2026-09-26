@@ -37,6 +37,9 @@ yarn-error.log*
 # local model cache
 .cache/
 
+# interrupted source-video upload
+public/templates/*.upload
+
 # vercel
 .vercel
 

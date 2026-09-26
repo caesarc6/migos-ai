@@ -25,7 +25,7 @@ The template performance is one file:
 
 `public/templates/performance.mp4`
 
-When that file is present, the studio plays it. When it is absent, the studio shows a placeholder stage — two performers, one microphone, rap and dance — and says the source clip will appear there. Drop the master file in later. No other wiring is required.
+When that file is present, the studio plays it. When it is absent, the studio shows a placeholder stage — two performers, one microphone, rap and dance — and an **Add source video** control. Choose an MP4 (up to 200 MB) on the Create page and MIGO saves it to that path. You can also copy the file into place yourself. No other wiring is required.
 
 ## How a cut is made
 

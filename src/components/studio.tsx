@@ -40,7 +40,13 @@ const emptySlot = (): SlotState => ({
   error: null,
 });
 
-export function Studio({ hasTemplateVideo }: { hasTemplateVideo: boolean }) {
+export function Studio({
+  hasTemplateVideo,
+  templateVersion,
+}: {
+  hasTemplateVideo: boolean;
+  templateVersion: string | null;
+}) {
   const [first, setFirst] = useState<SlotState>(emptySlot);
   const [second, setSecond] = useState<SlotState>(emptySlot);
   const [status, setStatus] = useState<Status>("idle");
@@ -143,7 +149,7 @@ export function Studio({ hasTemplateVideo }: { hasTemplateVideo: boolean }) {
         />
       </div>
 
-      <TemplateStage hasTemplateVideo={hasTemplateVideo} />
+      <TemplateStage hasTemplateVideo={hasTemplateVideo} templateVersion={templateVersion} />
 
       <div className="mt-8 flex flex-col gap-4 rounded-2xl border border-border bg-card/60 p-4 sm:p-5">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">

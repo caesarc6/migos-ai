@@ -1,5 +1,5 @@
 import { Studio } from "@/components/studio";
-import { hasTemplateVideo } from "@/lib/template";
+import { hasTemplateVideo, templateVideoVersion } from "@/lib/template";
 
 export const dynamic = "force-dynamic";
 
@@ -22,7 +22,7 @@ export default function CreatePage() {
           on this server, then builds a cut you can play and download. No video API key.
         </p>
       </div>
-      <Studio hasTemplateVideo={hasTemplateVideo()} />
+      <Studio hasTemplateVideo={hasTemplateVideo()} templateVersion={templateVideoVersion()} />
     </main>
   );
 }
