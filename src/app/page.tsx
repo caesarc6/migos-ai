@@ -13,7 +13,7 @@ const steps = [
   {
     number: "02",
     title: "Check the template",
-    body: "The piece is two artists rapping and dancing in front of one microphone. That source clip plays in the studio when public/templates/performance.mp4 is added. Until then you get a stand-in stage.",
+    body: "The piece is two artists rapping and dancing in front of one microphone. That source clip plays in the studio when public/templates/Migos.mp4 is added. Until then you get a stand-in stage.",
   },
   {
     number: "03",

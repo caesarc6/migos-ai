@@ -23,7 +23,7 @@ npm run dev -- --hostname 0.0.0.0 --port 47291
 
 The template performance is one file:
 
-`public/templates/performance.mp4`
+`public/templates/Migos.mp4`
 
 When that file is present, the studio plays it. When it is absent, the studio shows a placeholder stage — two performers, one microphone, rap and dance — and an **Add source video** control. Choose an MP4 (up to 200 MB) on the Create page and MIGO saves it to that path. You can also copy the file into place yourself. No other wiring is required.
 
@@ -47,7 +47,7 @@ The app is ready for Vercel.
 1. Import the repository.
 2. Leave the framework preset as Next.js. The build command is `next build`.
 3. Do not set secrets for the default path. Leave `VIDEO_PROVIDER` unset.
-4. Add `public/templates/performance.mp4` and redeploy when the master performance is ready.
+4. Add `public/templates/Migos.mp4` and redeploy when the master performance is ready.
 
 The server needs outbound access to Hugging Face the first time a cut is generated so the portrait model can download. `ffmpeg` is optional on the host; without it, MIGO returns the HTML preview of the same cutouts.
 

@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 export function templateVideoPath(): string {
-  return path.join(process.cwd(), "public", "templates", "performance.mp4");
+  return path.join(process.cwd(), "public", "templates", "Migos.mp4");
 }
 
 export function hasTemplateVideo(): boolean {
