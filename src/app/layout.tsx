@@ -28,7 +28,7 @@ export const metadata: Metadata = {
     template: "%s · MIGO",
   },
   description:
-    "Turn a two-artist rap and dance performance into a video starring characters you cut out of your own reference photos.",
+    "Replace the two performers in a fixed rap and dance video. The source clip stays; only the characters change.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

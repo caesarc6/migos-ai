@@ -83,9 +83,11 @@ async function waitForRender(
 export function Studio({
   hasTemplateVideo,
   templateVersion,
+  motion = false,
 }: {
   hasTemplateVideo: boolean;
   templateVersion: string | null;
+  motion?: boolean;
 }) {
   const [first, setFirst] = useState<SlotState>(emptySlot);
   const [second, setSecond] = useState<SlotState>(emptySlot);
@@ -110,14 +112,21 @@ export function Studio({
     panelRef.current?.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "nearest" });
   }, [status]);
 
-  const ready = Boolean(first.file && first.name.trim() && second.file && second.name.trim());
+  const castReady = Boolean(first.file && first.name.trim() && second.file && second.name.trim());
+  const ready = castReady && (!motion || hasTemplateVideo);
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (submitting.current || !first.file || !second.file) return;
     submitting.current = true;
     setStatus("loading");
-    setDetail(hasTemplateVideo ? "Starting the recast…" : "Cutting the characters out…");
+    setDetail(
+      motion && hasTemplateVideo
+        ? "Starting performer replacement…"
+        : hasTemplateVideo
+          ? "Starting the recast…"
+          : "Cutting the characters out…",
+    );
     setError(null);
     if (cutUrl.current) {
       URL.revokeObjectURL(cutUrl.current);
@@ -169,7 +178,7 @@ export function Studio({
           slot={first}
           placeholderName="Nova Vex"
           placeholderStyle="Loose shoulders, gold jacket, leans into the mic"
-          description="The artist on the left of the mic."
+          description={motion ? "Replaces the performer who starts on the left." : "The artist on the left of the mic."}
           onChange={setFirst}
         />
         <PerformerSlot
@@ -177,7 +186,7 @@ export function Studio({
           slot={second}
           placeholderName="Kite Morrow"
           placeholderStyle="Quick feet, looks camera-right on the hook"
-          description="The artist on the right of the mic."
+          description={motion ? "Replaces the other performer." : "The artist on the right of the mic."}
           onChange={setSecond}
         />
       </div>
@@ -194,17 +203,23 @@ export function Studio({
                 Generating…
               </>
             ) : (
-              hasTemplateVideo ? "Recast video" : "Generate cut"
+              motion ? "Replace performers" : hasTemplateVideo ? "Recast video" : "Generate cut"
             )}
           </Button>
         </div>
         {!ready && status !== "loading" ? (
-          <p className="text-sm text-muted-foreground">Add a reference image and a name for both performers.</p>
+          <p className="text-sm text-muted-foreground">
+            {motion && !hasTemplateVideo
+              ? "Add Migos.mp4 first. Performer replacement only edits that clip."
+              : "Add a reference image and a name for both performers."}
+          </p>
         ) : null}
         <p className="text-sm text-muted-foreground">
-          {hasTemplateVideo
-            ? "Migos.mp4 is the motion template. A face model keeps each target identity on one performer, including mouth and head movement, and the original audio stays. The first run downloads the models. Only use faces you have rights to."
-            : "Each photo is matted here with a portrait model. Add Migos.mp4 to drive the performance from that footage. Nothing is sent to a paid video API."}
+          {motion && hasTemplateVideo
+            ? "Migos.mp4 stays the shot. Each character is replaced in a separate pass, then both are placed back on the original frame. 480p is about $0.04 per second for each person, first 12 seconds. The source video and masks are uploaded once and reused."
+            : hasTemplateVideo
+              ? "Migos.mp4 is the motion template. A face model keeps each target identity on one performer, including mouth and head movement, and the original audio stays. The first run downloads the models. Full performer replacement uses VIDEO_PROVIDER=fal."
+              : "Each photo is matted here with a portrait model. Add Migos.mp4 to drive the performance from that footage. Nothing is sent to a paid video API."}
         </p>
       </div>
 
@@ -214,9 +229,11 @@ export function Studio({
           <div className="mt-3 rounded-2xl border border-dashed border-border px-6 py-12 text-center">
             <p className="font-display text-2xl tracking-tight">Nothing on the monitors yet.</p>
             <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-muted-foreground">
-              {hasTemplateVideo
-                ? "Add both performers, then recast. Person 1 stays on the performer who starts on the left. Person 2 stays on the other."
-                : "Add both performers, then generate. The cut plays here and downloads as a file, with your characters cut out of the photos."}
+              {motion && hasTemplateVideo
+                ? "Add both performers, then replace them one at a time. Person 1 is whoever starts on the left. Person 2 is the other. The rest of the frame stays Migos.mp4."
+                : hasTemplateVideo
+                  ? "Add both performers, then recast. Person 1 stays on the performer who starts on the left. Person 2 stays on the other."
+                  : "Add both performers, then generate. The cut plays here and downloads as a file, with your characters cut out of the photos."}
             </p>
           </div>
         ) : null}
@@ -225,14 +242,18 @@ export function Studio({
             <LoaderCircle className="mx-auto size-6 animate-spin text-primary" />
             <p className="mt-4 font-display text-2xl tracking-tight">
               {detail ??
-                (hasTemplateVideo
-                  ? `Recasting Migos.mp4 with ${first.name.trim() || "Performer 1"} and ${second.name.trim() || "Performer 2"}…`
-                  : `Cutting ${first.name.trim() || "Performer 1"} and ${second.name.trim() || "Performer 2"} out of their photos…`)}
+                (motion && hasTemplateVideo
+                  ? `Replacing ${first.name.trim() || "Performer 1"} and ${second.name.trim() || "Performer 2"} in Migos.mp4…`
+                  : hasTemplateVideo
+                    ? `Recasting Migos.mp4 with ${first.name.trim() || "Performer 1"} and ${second.name.trim() || "Performer 2"}…`
+                    : `Cutting ${first.name.trim() || "Performer 1"} and ${second.name.trim() || "Performer 2"} out of their photos…`)}
             </p>
             <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
-              {hasTemplateVideo
-                ? "The source performance keeps its motion, camera, timing, and audio. Each target face is driven by one original performer and stays on that person for the whole clip. The first 30 seconds are rendered."
-                : "The portrait model is separating each figure from the background, then placing those cutouts on the mic."}
+              {motion && hasTemplateVideo
+                ? "One performer at a time. The original frame stays underneath, and only the masked character is replaced. The first 12 seconds are rendered."
+                : hasTemplateVideo
+                  ? "The source performance keeps its motion, camera, timing, and audio. Each target face is driven by one original performer and stays on that person for the whole clip. The first 30 seconds are rendered."
+                  : "The portrait model is separating each figure from the background, then placing those cutouts on the mic."}
             </p>
           </div>
         ) : null}
@@ -291,11 +312,13 @@ function CutPlayer({ cut }: { cut: Cut }) {
             Starring {cut.performers[0]} and {cut.performers[1]}
           </p>
           <p className="mt-1 max-w-xl text-sm text-muted-foreground">
-            {cut.mode === "recast"
-              ? "The original performance drives the motion, expressions, camera, and audio. Your two identities stay mapped to the same performers."
-              : isVideo
-                ? "Short MP4. The figures are the matted cutouts from your uploads, standing on the stage around the mic."
-                : "Animated preview of the same cutouts. Download the file to keep it."}
+            {cut.mode === "motion"
+              ? "The original shot, camera, and audio stay. Each performer was replaced on their own pass and composited back onto Migos.mp4."
+              : cut.mode === "recast"
+                ? "The original performance drives the motion, expressions, camera, and audio. Your two identities stay mapped to the same performers."
+                : isVideo
+                  ? "Short MP4. The figures are the matted cutouts from your uploads, standing on the stage around the mic."
+                  : "Animated preview of the same cutouts. Download the file to keep it."}
           </p>
         </div>
         <a href={cut.url} download={cut.filename} className={cn(buttonVariants({ variant: "outline" }), "h-10 px-4")}>

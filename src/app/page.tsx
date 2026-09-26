@@ -18,7 +18,7 @@ const steps = [
   {
     number: "03",
     title: "Generate the cut",
-    body: "MIGO keeps the source motion, camera, timing, and audio, and renders each identity onto one performer. Play the result here, then download it. No video API key.",
+    body: "The free path recasts both faces on the source clip. With a Fal key, MIGO replaces one performer at a time in that same video and leaves the rest of the shot untouched.",
   },
 ];
 
@@ -32,10 +32,9 @@ export default function HomePage() {
             Your characters take the mic.
           </h1>
           <p className="mt-6 max-w-xl text-base leading-relaxed text-muted-foreground sm:text-lg">
-            The template is two artists rapping and dancing in front of one microphone. MIGO keeps that
-            performance and swaps both performers for characters you bring. Upload a reference image and a
-            name for each. A portrait model cuts them out of the photo, then the cut puts those figures on
-            the stage.
+            The template is two artists rapping and dancing in front of one microphone. That video stays
+            the shot. Upload a reference image and a name for each character. The free path recasts their
+            faces onto the performers. With a Fal key, MIGO replaces each performer in that same clip.
           </p>
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
             <Link href="/create" className={cn(buttonVariants(), "h-11 px-5")}>
@@ -56,7 +55,7 @@ export default function HomePage() {
           </div>
           <StageIllustration />
           <p className="border-t border-border px-4 py-3 text-sm text-muted-foreground">
-            Two artists. One microphone. Rap and dance. Your characters replace them after the cutout.
+            Two artists. One microphone. Rap and dance. The clip stays. The two performers are the part that changes.
           </p>
         </div>
       </section>

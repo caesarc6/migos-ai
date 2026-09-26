@@ -36,6 +36,14 @@ async function runJob(job: JobSnapshot, input: GenerateInput) {
         job.progress = 0.12 + (0.8 * index) / total;
       } else if (message.startsWith("Downloading")) {
         job.progress = 0.08;
+      } else if (message.startsWith("Uploading") || message.startsWith("Using the saved")) {
+        job.progress = 0.35;
+      } else if (message.startsWith("Replacing one")) {
+        job.progress = 0.5;
+      } else if (message.startsWith("Replacing")) {
+        job.progress = Math.min(0.88, job.progress + 0.15);
+      } else if (message.startsWith("Placing")) {
+        job.progress = 0.94;
       } else if (message.startsWith("Joining")) {
         job.progress = 0.94;
       }

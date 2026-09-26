@@ -7,6 +7,7 @@ import { promisify } from "node:util";
 import { templateVideoPath } from "@/lib/template";
 import { cutOutCharacter } from "@/lib/video/cutout";
 import { VideoProviderError } from "@/lib/video/errors";
+import { replaceBothPerformers } from "@/lib/video/motion/fal";
 import { recastPerformance } from "@/lib/video/swap/recast";
 
 const execFileAsync = promisify(execFile);
@@ -34,29 +35,48 @@ export type GenerateResult = {
   data: Buffer;
   mimeType: string;
   filename: string;
-  mode: "recast" | "stand-in" | "preview";
+  mode: "recast" | "stand-in" | "preview" | "motion";
 };
 
 export interface VideoProvider {
-  readonly id: "mock" | "external";
+  readonly id: "mock" | "external" | "fal";
   generate(input: GenerateInput, onProgress?: (message: string) => void): Promise<GenerateResult>;
 }
 
 export { VideoProviderError } from "@/lib/video/errors";
 
 /**
- * Unset or `VIDEO_PROVIDER=mock` mattes both photos with MODNet. When Migos.mp4 is present,
- * a person detector follows the two performers and the cutouts are composited onto that footage.
- * Otherwise the cutouts land on a short stand-in stage. `VIDEO_PROVIDER=external` never calls a paid API.
+ * Unset or `VIDEO_PROVIDER=mock` recasts faces on Migos.mp4 locally, or mattes photos when that file is absent.
+ * `VIDEO_PROVIDER=fal` replaces one performer at a time through Fal Wan VACE and composites them onto the same clip.
+ * `VIDEO_PROVIDER=external` never calls a paid API.
  */
 export function getVideoProvider(): VideoProvider {
   const mode = (process.env.VIDEO_PROVIDER ?? "mock").trim().toLowerCase();
+  if (mode === "fal") return new FalMotionProvider();
   if (mode === "external") return new ExternalVideoProvider();
   if (mode === "mock" || mode === "") return new LocalVideoProvider();
   throw new VideoProviderError(
-    `Unknown VIDEO_PROVIDER "${mode}". Use mock or external.`,
+    `Unknown VIDEO_PROVIDER "${mode}". Use mock, fal, or external.`,
     500,
   );
+}
+
+class FalMotionProvider implements VideoProvider {
+  readonly id = "fal" as const;
+
+  async generate(input: GenerateInput, onProgress?: (message: string) => void): Promise<GenerateResult> {
+    const source = await probeTemplate();
+    if (!source) {
+      throw new VideoProviderError(
+        "Add Migos.mp4 first. The paid model replaces the two performers in that same clip and leaves the rest of the shot alone.",
+        422,
+      );
+    }
+    if (!(await ffmpegAvailable())) {
+      throw new VideoProviderError("ffmpeg is required to prepare Migos.mp4 for performer replacement.", 500);
+    }
+    return replaceBothPerformers(input, source.path, onProgress);
+  }
 }
 
 class ExternalVideoProvider implements VideoProvider {
