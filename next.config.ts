@@ -3,6 +3,9 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   // The dev server is opened at 127.0.0.1 while bound on 0.0.0.0.
   allowedDevOrigins: ["127.0.0.1"],
+  outputFileTracingIncludes: {
+    "/api/generate": ["./src/lib/video/swap/inswapper-emap.bin"],
+  },
   experimental: {
     // Reference images, and a source performance upload, can exceed the default body size.
     proxyClientMaxBodySize: "256mb",

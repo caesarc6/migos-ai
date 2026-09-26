@@ -8,7 +8,7 @@ const steps = [
   {
     number: "01",
     title: "Bring two characters",
-    body: "A reference image and a short name for each performer. Add a one-line style note if you want a specific read: jacket, posture, where they look.",
+    body: "A front-facing photo and a short name for each performer. A second face photo is optional and steadies the identity.",
   },
   {
     number: "02",
@@ -18,7 +18,7 @@ const steps = [
   {
     number: "03",
     title: "Generate the cut",
-    body: "MIGO mattes each reference with a local portrait model and places those cutouts on the stage. Play the result here, then download the file. No video API key.",
+    body: "MIGO keeps the source motion, camera, timing, and audio, and renders each identity onto one performer. Play the result here, then download it. No video API key.",
   },
 ];
 

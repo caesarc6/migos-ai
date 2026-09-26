@@ -1,6 +1,7 @@
 import { CUTOUT_MODEL } from "@/lib/video/cutout";
 import { VideoProviderError } from "@/lib/video/errors";
-import { getVideoProvider, type GenerateInput, type PerformerInput } from "@/lib/video/provider";
+import { readJob, startJob } from "@/lib/video/jobs";
+import type { GenerateInput, PerformerInput } from "@/lib/video/provider";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -18,6 +19,37 @@ const ALLOWED_MIME = new Set([
   "image/gif",
 ]);
 
+export async function GET(request: Request) {
+  const url = new URL(request.url);
+  const id = url.searchParams.get("job") ?? "";
+  const job = readJob(id);
+  if (!job) return Response.json({ error: "That render is no longer available." }, { status: 404 });
+  if (url.searchParams.get("download") === "1") {
+    if (job.status !== "done" || !job.result) {
+      return Response.json({ error: "The render is not ready yet." }, { status: 409 });
+    }
+    const result = job.result;
+    return new Response(new Uint8Array(result.data), {
+      status: 200,
+      headers: {
+        "Content-Type": result.mimeType,
+        "Content-Disposition": `inline; filename="${result.filename}"`,
+        "Cache-Control": "no-store",
+        "X-Content-Type-Options": "nosniff",
+        "X-Migo-Filename": result.filename,
+        "X-Migo-Model": result.mode === "recast" ? "inswapper_128" : CUTOUT_MODEL,
+        "X-Migo-Mode": result.mode,
+      },
+    });
+  }
+  return Response.json({
+    status: job.status,
+    progress: job.progress,
+    message: job.message,
+    error: job.error ?? null,
+  });
+}
+
 export async function POST(request: Request) {
   let form: FormData;
   try {
@@ -28,18 +60,8 @@ export async function POST(request: Request) {
 
   try {
     const input = await readGenerateInput(form);
-    const result = await getVideoProvider().generate(input);
-    return new Response(new Uint8Array(result.data), {
-      status: 200,
-      headers: {
-        "Content-Type": result.mimeType,
-        "Content-Disposition": `inline; filename="${result.filename}"`,
-        "Cache-Control": "no-store",
-        "X-Content-Type-Options": "nosniff",
-        "X-Migo-Filename": result.filename,
-        "X-Migo-Model": CUTOUT_MODEL,
-      },
-    });
+    const jobId = startJob(input);
+    return Response.json({ jobId }, { status: 202 });
   } catch (error) {
     if (error instanceof VideoProviderError) {
       return Response.json({ error: error.message }, { status: error.status });
@@ -63,7 +85,13 @@ async function readPerformer(form: FormData, index: 1 | 2): Promise<PerformerInp
     throw new VideoProviderError(`${label} needs a short name.`, 400);
   }
   const image = await readImage(form.get(`performer${index}Image`), label);
-  return { name, styleNote, image: image.data, mimeType: image.mimeType };
+  const extraValue = form.get(`performer${index}Extra`);
+  const extraImages: Buffer[] = [];
+  if (extraValue instanceof File && extraValue.size > 0) {
+    const extra = await readImage(extraValue, `${label} extra reference`);
+    extraImages.push(extra.data);
+  }
+  return { name, styleNote, image: image.data, mimeType: image.mimeType, extraImages };
 }
 
 function readLine(value: FormDataEntryValue | null, max: number): string {

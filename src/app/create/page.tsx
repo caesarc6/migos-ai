@@ -17,9 +17,9 @@ export default function CreatePage() {
           Cast the performance
         </h1>
         <p className="mt-4 text-base leading-relaxed text-muted-foreground sm:text-lg">
-          Performer 1 and Performer 2 take the place of the two artists in Migos.mp4. Give each a reference
-          image and a short name. A one-line style note is optional. MIGO cuts each figure out of the photo,
-          follows the two performers in that footage, and builds a cut you can play and download. No video API key.
+          Performer 1 and Performer 2 take the place of the two artists in Migos.mp4. Give each a clear
+          face photo and a short name. MIGO keeps that performance’s motion, camera, timing, and audio, and
+          renders your identities onto the two performers. No video API key.
         </p>
       </div>
       <Studio hasTemplateVideo={hasTemplateVideo()} templateVersion={templateVideoVersion()} />

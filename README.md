@@ -31,7 +31,9 @@ When that file is present, the studio plays it. When it is absent, the studio sh
 
 The default provider (`VIDEO_PROVIDER` unset or `mock`) does not call a paid video API. It runs [MODNet](https://huggingface.co/Xenova/modnet) (Apache-2.0) through [Transformers.js](https://github.com/huggingface/transformers.js) and composites the transparent cutouts.
 
-When `public/templates/Migos.mp4` is present, [DETR](https://huggingface.co/Xenova/detr-resnet-50) finds the two performers across the clip. ffmpeg keeps that footage and its audio, dims those people, and overlays your cutouts in their place for up to three minutes. `ffmpeg` has to be on `PATH` for that recast.
+When `public/templates/Migos.mp4` is present, MIGO treats that clip as the performance template. It detects and tracks both faces for the whole shot, encodes each uploaded photo as an identity, and renders that identity onto the matching performer so head movement, expression, and mouth timing come from the source. The background, body, camera, and original audio stay. The render covers the first 30 seconds at 20 fps. `ffmpeg` has to be on `PATH`. The first run downloads the face models into `.cache/faces`.
+
+An optional second face photo per performer is averaged into that identity. Person 1 is locked to the performer who starts on the left, and Person 2 to the other. That mapping does not switch mid-video.
 
 Without the source file:
 

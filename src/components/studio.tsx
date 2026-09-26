@@ -19,6 +19,7 @@ type SlotState = {
   name: string;
   styleNote: string;
   file: File | null;
+  extra: File | null;
   previewUrl: string | null;
   error: string | null;
 };
@@ -27,6 +28,7 @@ type Cut = {
   url: string;
   filename: string;
   mimeType: string;
+  mode: string;
   performers: [string, string];
 };
 
@@ -36,9 +38,47 @@ const emptySlot = (): SlotState => ({
   name: "",
   styleNote: "",
   file: null,
+  extra: null,
   previewUrl: null,
   error: null,
 });
+
+async function waitForRender(
+  jobId: string,
+  onDetail: (message: string) => void,
+): Promise<{ data: Blob; filename: string; mimeType: string; mode: string }> {
+  for (;;) {
+    const status = await fetch(`/api/generate?job=${encodeURIComponent(jobId)}`, { cache: "no-store" });
+    const payload = (await status.json().catch(() => null)) as {
+      status?: string;
+      message?: string;
+      error?: string | null;
+    } | null;
+    if (!status.ok) throw new Error(payload?.error ?? "The render stopped.");
+    if (payload?.message) onDetail(payload.message);
+    if (payload?.status === "error") throw new Error(payload.error ?? "The performance could not be recast.");
+    if (payload?.status === "done") break;
+    await new Promise((resolve) => setTimeout(resolve, 800));
+  }
+  const download = await fetch(`/api/generate?job=${encodeURIComponent(jobId)}&download=1`);
+  if (!download.ok) {
+    const payload = (await download.json().catch(() => null)) as { error?: string } | null;
+    throw new Error(payload?.error ?? "The render could not be downloaded.");
+  }
+  const headerName = download.headers.get("X-Migo-Filename") ?? "";
+  const data = await download.blob();
+  const filename = /^[\w.-]+$/.test(headerName)
+    ? headerName
+    : data.type.includes("html")
+      ? "migo-cut.html"
+      : "migo-cut.mp4";
+  return {
+    data,
+    filename,
+    mimeType: data.type || download.headers.get("Content-Type") || "",
+    mode: download.headers.get("X-Migo-Mode") ?? "",
+  };
+}
 
 export function Studio({
   hasTemplateVideo,
@@ -50,6 +90,7 @@ export function Studio({
   const [first, setFirst] = useState<SlotState>(emptySlot);
   const [second, setSecond] = useState<SlotState>(emptySlot);
   const [status, setStatus] = useState<Status>("idle");
+  const [detail, setDetail] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [cut, setCut] = useState<Cut | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
@@ -76,6 +117,7 @@ export function Studio({
     if (submitting.current || !first.file || !second.file) return;
     submitting.current = true;
     setStatus("loading");
+    setDetail(hasTemplateVideo ? "Starting the recast…" : "Cutting the characters out…");
     setError(null);
     if (cutUrl.current) {
       URL.revokeObjectURL(cutUrl.current);
@@ -88,35 +130,26 @@ export function Studio({
       body.set("performer1Name", first.name.trim());
       body.set("performer1Style", first.styleNote.replace(/\s+/g, " ").trim());
       body.set("performer1Image", first.file);
+      if (first.extra) body.set("performer1Extra", first.extra);
       body.set("performer2Name", second.name.trim());
       body.set("performer2Style", second.styleNote.replace(/\s+/g, " ").trim());
       body.set("performer2Image", second.file);
+      if (second.extra) body.set("performer2Extra", second.extra);
 
       const response = await fetch("/api/generate", { method: "POST", body });
-      if (!response.ok) {
-        let message = "The cut could not be rendered.";
-        try {
-          const payload = (await response.json()) as { error?: string };
-          if (payload.error) message = payload.error;
-        } catch {
-          // Keep the fallback message when the body is not JSON.
-        }
-        throw new Error(message);
+      const started = (await response.json().catch(() => null)) as { jobId?: string; error?: string } | null;
+      if (!response.ok || !started?.jobId) {
+        throw new Error(started?.error ?? "The cut could not be rendered.");
       }
 
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
+      const blob = await waitForRender(started.jobId, setDetail);
+      const url = URL.createObjectURL(blob.data);
       cutUrl.current = url;
-      const headerName = response.headers.get("X-Migo-Filename") ?? "";
-      const filename = /^[\w.-]+$/.test(headerName)
-        ? headerName
-        : blob.type.includes("html")
-          ? "migo-cut.html"
-          : "migo-cut.mp4";
       setCut({
         url,
-        filename,
-        mimeType: blob.type || response.headers.get("Content-Type") || "",
+        filename: blob.filename,
+        mimeType: blob.mimeType,
+        mode: blob.mode,
         performers: [first.name.trim(), second.name.trim()],
       });
       setStatus("ready");
@@ -170,8 +203,8 @@ export function Studio({
         ) : null}
         <p className="text-sm text-muted-foreground">
           {hasTemplateVideo
-            ? "Each photo is cut out here, then a person detector follows the two performers in Migos.mp4 and puts your characters in their place. The first run downloads those models. Nothing is sent to a paid video API."
-            : "Each photo is matted here with a portrait model. The first cut on this machine downloads that model. Add Migos.mp4 to recast that footage. Nothing is sent to a paid video API."}
+            ? "Migos.mp4 is the motion template. A face model keeps each target identity on one performer, including mouth and head movement, and the original audio stays. The first run downloads the models. Only use faces you have rights to."
+            : "Each photo is matted here with a portrait model. Add Migos.mp4 to drive the performance from that footage. Nothing is sent to a paid video API."}
         </p>
       </div>
 
@@ -182,7 +215,7 @@ export function Studio({
             <p className="font-display text-2xl tracking-tight">Nothing on the monitors yet.</p>
             <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-muted-foreground">
               {hasTemplateVideo
-                ? "Add both performers, then recast. The result plays Migos.mp4 with your characters standing in for the two artists."
+                ? "Add both performers, then recast. Person 1 stays on the performer who starts on the left. Person 2 stays on the other."
                 : "Add both performers, then generate. The cut plays here and downloads as a file, with your characters cut out of the photos."}
             </p>
           </div>
@@ -191,13 +224,14 @@ export function Studio({
           <div role="status" className="mt-3 rounded-2xl border border-primary/30 bg-primary/5 px-6 py-12 text-center">
             <LoaderCircle className="mx-auto size-6 animate-spin text-primary" />
             <p className="mt-4 font-display text-2xl tracking-tight">
-              {hasTemplateVideo
-                ? `Recasting Migos.mp4 with ${first.name.trim() || "Performer 1"} and ${second.name.trim() || "Performer 2"}…`
-                : `Cutting ${first.name.trim() || "Performer 1"} and ${second.name.trim() || "Performer 2"} out of their photos…`}
+              {detail ??
+                (hasTemplateVideo
+                  ? `Recasting Migos.mp4 with ${first.name.trim() || "Performer 1"} and ${second.name.trim() || "Performer 2"}…`
+                  : `Cutting ${first.name.trim() || "Performer 1"} and ${second.name.trim() || "Performer 2"} out of their photos…`)}
             </p>
             <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
               {hasTemplateVideo
-                ? "The portrait model cuts each character out. A detector then follows the two people in the source video and places those cutouts on them, with the original sound."
+                ? "The source performance keeps its motion, camera, timing, and audio. Each target face is driven by one original performer and stays on that person for the whole clip. The first 30 seconds are rendered."
                 : "The portrait model is separating each figure from the background, then placing those cutouts on the mic."}
             </p>
           </div>
@@ -257,9 +291,11 @@ function CutPlayer({ cut }: { cut: Cut }) {
             Starring {cut.performers[0]} and {cut.performers[1]}
           </p>
           <p className="mt-1 max-w-xl text-sm text-muted-foreground">
-            {isVideo
-              ? "Short MP4. The figures are the matted cutouts from your uploads, standing on the stage around the mic."
-              : "Animated preview of the same cutouts. Download the file to keep it."}
+            {cut.mode === "recast"
+              ? "The original performance drives the motion, expressions, camera, and audio. Your two identities stay mapped to the same performers."
+              : isVideo
+                ? "Short MP4. The figures are the matted cutouts from your uploads, standing on the stage around the mic."
+                : "Animated preview of the same cutouts. Download the file to keep it."}
           </p>
         </div>
         <a href={cut.url} download={cut.filename} className={cn(buttonVariants({ variant: "outline" }), "h-10 px-4")}>
@@ -290,15 +326,19 @@ function PerformerSlot({
   const nameId = `${uid}-name`;
   const styleId = `${uid}-style`;
   const fileId = `${uid}-file`;
+  const extraId = `${uid}-extra`;
+
+  function takeImage(file: File | undefined): string | null {
+    if (!file) return "Choose an image.";
+    if (!ALLOWED.has(file.type)) return "Use a PNG, JPG, WEBP, or GIF.";
+    if (file.size > MAX_BYTES) return "That image is larger than 8 MB.";
+    return null;
+  }
 
   function onFile(file: File | undefined) {
-    if (!file) return;
-    if (!ALLOWED.has(file.type)) {
-      onChange({ ...slot, error: "Use a PNG, JPG, WEBP, or GIF." });
-      return;
-    }
-    if (file.size > MAX_BYTES) {
-      onChange({ ...slot, error: "That image is larger than 8 MB." });
+    const problem = takeImage(file);
+    if (!file || problem) {
+      onChange({ ...slot, error: problem });
       return;
     }
     if (slot.previewUrl) URL.revokeObjectURL(slot.previewUrl);
@@ -351,6 +391,26 @@ function PerformerSlot({
             </span>
           )}
         </label>
+        <div className="flex flex-col gap-2">
+          <Label htmlFor={extraId}>
+            Extra face photo <span className="font-normal text-muted-foreground">optional</span>
+          </Label>
+          <Input
+            id={extraId}
+            name={`performer${index}Extra`}
+            type="file"
+            accept={ACCEPT}
+            className="h-10"
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              const problem = file ? takeImage(file) : null;
+              onChange({ ...slot, extra: problem ? null : (file ?? null), error: problem });
+            }}
+          />
+          <p className="text-xs text-muted-foreground">
+            {slot.extra ? slot.extra.name : "A second front-facing photo steadies the identity."}
+          </p>
+        </div>
         {slot.error ? (
           <p role="alert" className="text-sm text-destructive">
             {slot.error}
