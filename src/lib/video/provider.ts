@@ -4,8 +4,11 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
+import sharp from "sharp";
+import { templateVideoPath } from "@/lib/template";
 import { cutOutCharacter } from "@/lib/video/cutout";
 import { VideoProviderError } from "@/lib/video/errors";
+import { locatePerformers, type TrackSample } from "@/lib/video/track";
 
 const execFileAsync = promisify(execFile);
 
@@ -41,8 +44,9 @@ export interface VideoProvider {
 export { VideoProviderError } from "@/lib/video/errors";
 
 /**
- * Unset or `VIDEO_PROVIDER=mock` mattes both photos with MODNet and composites the cutouts.
- * `VIDEO_PROVIDER=external` is an env-gated stub and never calls a paid video API.
+ * Unset or `VIDEO_PROVIDER=mock` mattes both photos with MODNet. When Migos.mp4 is present,
+ * a person detector follows the two performers and the cutouts are composited onto that footage.
+ * Otherwise the cutouts land on a short stand-in stage. `VIDEO_PROVIDER=external` never calls a paid API.
  */
 export function getVideoProvider(): VideoProvider {
   const mode = (process.env.VIDEO_PROVIDER ?? "mock").trim().toLowerCase();
@@ -74,6 +78,16 @@ class LocalVideoProvider implements VideoProvider {
 
   async generate(input: GenerateInput): Promise<GenerateResult> {
     const cutouts = await withCutouts(input);
+    const source = await probeTemplate();
+    if (source) {
+      if (!(await ffmpegAvailable())) {
+        throw new VideoProviderError(
+          "ffmpeg is required to recast Migos.mp4. Install ffmpeg and generate again.",
+          500,
+        );
+      }
+      return renderOnSource(cutouts, source);
+    }
     if (await ffmpegAvailable()) {
       try {
         return await renderMp4(cutouts);
@@ -105,6 +119,188 @@ async function ffmpegAvailable(): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+type SourceVideo = {
+  path: string;
+  duration: number;
+  width: number;
+  height: number;
+  hasAudio: boolean;
+};
+
+async function probeTemplate(): Promise<SourceVideo | null> {
+  const file = templateVideoPath();
+  if (!existsSync(file)) return null;
+  try {
+    const { stdout } = await execFileAsync(
+      "ffprobe",
+      ["-v", "error", "-print_format", "json", "-show_format", "-show_streams", file],
+      { timeout: 8000, maxBuffer: 2 * 1024 * 1024 },
+    );
+    const parsed = JSON.parse(stdout) as {
+      format?: { duration?: string };
+      streams?: Array<{ codec_type?: string; width?: number; height?: number; duration?: string }>;
+    };
+    const video = parsed.streams?.find((stream) => stream.codec_type === "video");
+    const duration = Number(parsed.format?.duration ?? video?.duration ?? 0);
+    const width = Number(video?.width ?? 0);
+    const height = Number(video?.height ?? 0);
+    if (!video || !Number.isFinite(duration) || duration < 0.4 || width < 16 || height < 16) return null;
+    return {
+      path: file,
+      duration: Math.min(duration, 180),
+      width,
+      height,
+      hasAudio: Boolean(parsed.streams?.some((stream) => stream.codec_type === "audio")),
+    };
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    console.error("MIGO could not read Migos.mp4", detail.slice(-800));
+    throw new VideoProviderError("Migos.mp4 is in the project, but it could not be read as a video.", 422);
+  }
+}
+
+async function renderOnSource(input: GenerateInput, source: SourceVideo): Promise<GenerateResult> {
+  const dir = await mkdtemp(path.join(os.tmpdir(), "migo-"));
+  try {
+    const [first, second] = input.performers;
+    const leftPath = path.join(dir, "left.png");
+    const rightPath = path.join(dir, "right.png");
+    const scriptPath = path.join(dir, "filter.txt");
+    const outPath = path.join(dir, "cut.mp4");
+    await writeFile(leftPath, first.image);
+    await writeFile(rightPath, second.image);
+    const track = await locatePerformers(source.path, source.duration);
+    const leftAspect = await imageAspect(first.image);
+    const rightAspect = await imageAspect(second.image);
+    await writeFile(scriptPath, buildSourceFilter(source, track, leftAspect, rightAspect), "utf8");
+
+    const args = [
+      "-hide_banner",
+      "-loglevel",
+      "error",
+      "-y",
+      "-i",
+      source.path,
+      "-loop",
+      "1",
+      "-i",
+      leftPath,
+      "-loop",
+      "1",
+      "-i",
+      rightPath,
+      "-filter_complex_script",
+      scriptPath,
+      "-map",
+      "[out]",
+      ...(source.hasAudio ? ["-map", "0:a:0", "-c:a", "aac", "-b:a", "160k"] : []),
+      "-t",
+      source.duration.toFixed(3),
+      "-c:v",
+      "libx264",
+      "-pix_fmt",
+      "yuv420p",
+      "-movflags",
+      "+faststart",
+      outPath,
+    ];
+    try {
+      await execFileAsync("ffmpeg", args, {
+        timeout: Math.min(180_000, 25_000 + source.duration * 4_000),
+        maxBuffer: 8 * 1024 * 1024,
+      });
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      console.error("MIGO source recast failed", detail.slice(-1200));
+      throw new VideoProviderError("The source video could not be recast with these characters.", 500);
+    }
+
+    const data = await readFile(outPath);
+    if (data.length < 1000) {
+      throw new VideoProviderError("The source video could not be recast with these characters.", 500);
+    }
+    return { data, mimeType: "video/mp4", filename: "migo-cut.mp4" };
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+}
+
+async function imageAspect(image: Buffer): Promise<number> {
+  const meta = await sharp(image).metadata();
+  const width = meta.width ?? 1;
+  const height = meta.height ?? 1;
+  return width / height;
+}
+
+function buildSourceFilter(
+  source: SourceVideo,
+  track: TrackSample[],
+  leftAspect: number,
+  rightAspect: number,
+): string {
+  const left = track.map((sample) => ({ t: sample.t, body: sample.left }));
+  const right = track.map((sample) => ({ t: sample.t, body: sample.right }));
+  const lines = [
+    `[0:v]${dimBox(left)},${dimBox(right)}[dim]`,
+    `[1:v]format=rgba,scale=w='${sizedExpr(left, source.height, leftAspect)}':h='${heightExpr(left, source.height)}':eval=frame[left]`,
+    `[2:v]format=rgba,scale=w='${sizedExpr(right, source.height, rightAspect)}':h='${heightExpr(right, source.height)}':eval=frame[right]`,
+    `[dim][left]overlay=x='${centerX(left)}':y='${feetY(left)}':format=auto[v1]`,
+    `[v1][right]overlay=x='${centerX(right)}':y='${feetY(right)}':format=auto,format=yuv420p[out]`,
+  ];
+  return lines.join(";\n");
+}
+
+function dimBox(samples: Array<{ t: number; body: TrackSample["left"] }>): string {
+  const cx = seriesExpr(samples.map((sample) => ({ t: sample.t, v: sample.body.cx })));
+  const cy = seriesExpr(samples.map((sample) => ({ t: sample.t, v: sample.body.cy })));
+  const w = seriesExpr(samples.map((sample) => ({ t: sample.t, v: sample.body.w })));
+  const h = seriesExpr(samples.map((sample) => ({ t: sample.t, v: sample.body.h })));
+  return `drawbox=x='(${cx}-(${w})/2)*iw':y='(${cy}-(${h})/2)*ih':w='(${w})*iw':h='(${h})*ih':color=black@0.78:t=fill`;
+}
+
+function heightExpr(samples: Array<{ t: number; body: TrackSample["left"] }>, frameHeight: number): string {
+  return `(${seriesExpr(samples.map((sample) => ({ t: sample.t, v: sample.body.h * 1.12 })))})*${Math.round(frameHeight)}`;
+}
+
+function sizedExpr(
+  samples: Array<{ t: number; body: TrackSample["left"] }>,
+  frameHeight: number,
+  aspect: number,
+): string {
+  return `(${heightExpr(samples, frameHeight)})*${num(aspect)}`;
+}
+
+function centerX(samples: Array<{ t: number; body: TrackSample["left"] }>): string {
+  const cx = seriesExpr(samples.map((sample) => ({ t: sample.t, v: sample.body.cx })));
+  return `(${cx})*main_w-overlay_w/2`;
+}
+
+function feetY(samples: Array<{ t: number; body: TrackSample["left"] }>): string {
+  const bottom = seriesExpr(
+    samples.map((sample) => ({ t: sample.t, v: sample.body.cy + sample.body.h / 2 })),
+  );
+  return `(${bottom})*main_h-overlay_h`;
+}
+
+function seriesExpr(keys: Array<{ t: number; v: number }>): string {
+  if (keys.length === 0) return "0";
+  const ordered = [...keys].sort((a, b) => a.t - b.t);
+  let expr = num(ordered[ordered.length - 1]!.v);
+  for (let index = ordered.length - 2; index >= 0; index -= 1) {
+    const start = ordered[index]!;
+    const end = ordered[index + 1]!;
+    const span = Math.max(end.t - start.t, 0.001);
+    const lerp = `${num(start.v)}+(${num(end.v - start.v)})*(t-${num(start.t)})/${num(span)}`;
+    expr = `if(lt(t\\,${num(end.t)})\\,${lerp}\\,${expr})`;
+  }
+  return expr;
+}
+
+function num(value: number): string {
+  const rounded = Math.round(value * 1000) / 1000;
+  return Object.is(rounded, -0) ? "0" : String(rounded);
 }
 
 async function renderMp4(input: GenerateInput): Promise<GenerateResult> {

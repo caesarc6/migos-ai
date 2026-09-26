@@ -4,7 +4,7 @@ import { getVideoProvider, type GenerateInput, type PerformerInput } from "@/lib
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 const MAX_NAME = 40;

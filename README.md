@@ -31,7 +31,11 @@ When that file is present, the studio plays it. When it is absent, the studio sh
 
 The default provider (`VIDEO_PROVIDER` unset or `mock`) does not call a paid video API. It runs [MODNet](https://huggingface.co/Xenova/modnet) (Apache-2.0) through [Transformers.js](https://github.com/huggingface/transformers.js) and composites the transparent cutouts.
 
-- If `ffmpeg` is on `PATH`, the result is a short MP4.
+When `public/templates/Migos.mp4` is present, [DETR](https://huggingface.co/Xenova/detr-resnet-50) finds the two performers across the clip. ffmpeg keeps that footage and its audio, dims those people, and overlays your cutouts in their place for up to three minutes. `ffmpeg` has to be on `PATH` for that recast.
+
+Without the source file:
+
+- If `ffmpeg` is on `PATH`, the result is a short stand-in MP4.
 - If `ffmpeg` is missing, the result is a self-contained HTML preview the page can play and download.
 
 The first generation downloads the model weights from Hugging Face into the temp directory. Later generations reuse that cache. No `VIDEO_API_KEY` is required.

@@ -161,7 +161,7 @@ export function Studio({
                 Generating…
               </>
             ) : (
-              "Generate cut"
+              hasTemplateVideo ? "Recast video" : "Generate cut"
             )}
           </Button>
         </div>
@@ -169,8 +169,9 @@ export function Studio({
           <p className="text-sm text-muted-foreground">Add a reference image and a name for both performers.</p>
         ) : null}
         <p className="text-sm text-muted-foreground">
-          Each photo is matted here with a portrait model. The first cut on this machine downloads that model.
-          Nothing is sent to a paid video API.
+          {hasTemplateVideo
+            ? "Each photo is cut out here, then a person detector follows the two performers in Migos.mp4 and puts your characters in their place. The first run downloads those models. Nothing is sent to a paid video API."
+            : "Each photo is matted here with a portrait model. The first cut on this machine downloads that model. Add Migos.mp4 to recast that footage. Nothing is sent to a paid video API."}
         </p>
       </div>
 
@@ -180,8 +181,9 @@ export function Studio({
           <div className="mt-3 rounded-2xl border border-dashed border-border px-6 py-12 text-center">
             <p className="font-display text-2xl tracking-tight">Nothing on the monitors yet.</p>
             <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-muted-foreground">
-              Add both performers, then generate. The cut plays here and downloads as a file, with your
-              characters cut out of the photos.
+              {hasTemplateVideo
+                ? "Add both performers, then recast. The result plays Migos.mp4 with your characters standing in for the two artists."
+                : "Add both performers, then generate. The cut plays here and downloads as a file, with your characters cut out of the photos."}
             </p>
           </div>
         ) : null}
@@ -189,12 +191,14 @@ export function Studio({
           <div role="status" className="mt-3 rounded-2xl border border-primary/30 bg-primary/5 px-6 py-12 text-center">
             <LoaderCircle className="mx-auto size-6 animate-spin text-primary" />
             <p className="mt-4 font-display text-2xl tracking-tight">
-              Cutting {first.name.trim() || "Performer 1"} and {second.name.trim() || "Performer 2"} out of
-              their photos…
+              {hasTemplateVideo
+                ? `Recasting Migos.mp4 with ${first.name.trim() || "Performer 1"} and ${second.name.trim() || "Performer 2"}…`
+                : `Cutting ${first.name.trim() || "Performer 1"} and ${second.name.trim() || "Performer 2"} out of their photos…`}
             </p>
             <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
-              The portrait model is separating each figure from the background, then placing those cutouts
-              on the mic.
+              {hasTemplateVideo
+                ? "The portrait model cuts each character out. A detector then follows the two people in the source video and places those cutouts on them, with the original sound."
+                : "The portrait model is separating each figure from the background, then placing those cutouts on the mic."}
             </p>
           </div>
         ) : null}
