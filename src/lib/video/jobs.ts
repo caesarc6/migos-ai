@@ -15,7 +15,7 @@ const jobs = new Map<string, JobSnapshot>();
 
 export function startJob(input: GenerateInput): string {
   const id = randomUUID();
-  const job: JobSnapshot = { status: "running", progress: 0.02, message: "Starting the recast…" };
+  const job: JobSnapshot = { status: "running", progress: 0.02, message: "Starting performer replacement…" };
   jobs.set(id, job);
   void runJob(job, input);
   return id;
@@ -57,8 +57,8 @@ async function runJob(job: JobSnapshot, input: GenerateInput) {
   } catch (error) {
     job.status = "error";
     job.statusCode = error instanceof VideoProviderError ? error.status : 500;
-    job.error = error instanceof VideoProviderError ? error.message : "The performance could not be recast.";
-    if (!(error instanceof VideoProviderError)) console.error("MIGO recast failed", error);
+    job.error = error instanceof VideoProviderError ? error.message : "The performers could not be replaced.";
+    if (!(error instanceof VideoProviderError)) console.error("MIGO replacement failed", error);
   }
 }
 

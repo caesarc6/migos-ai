@@ -13,12 +13,12 @@ const steps = [
   {
     number: "02",
     title: "Check the template",
-    body: "The piece is two artists rapping and dancing in front of one microphone. That source clip plays in the studio when public/templates/Migos.mp4 is added. Until then you get a stand-in stage.",
+    body: "The piece is two artists rapping and dancing in front of one microphone. That source clip plays in the studio when public/templates/Migos.mp4 is added.",
   },
   {
     number: "03",
     title: "Generate the cut",
-    body: "The free path recasts both faces on the source clip. With a Fal key, MIGO replaces one performer at a time in that same video and leaves the rest of the shot untouched.",
+    body: "MIGO replaces one performer at a time in that same video, then places both back on the original frame. The first 12 seconds, the timing, and the audio stay with the source.",
   },
 ];
 
@@ -33,8 +33,8 @@ export default function HomePage() {
           </h1>
           <p className="mt-6 max-w-xl text-base leading-relaxed text-muted-foreground sm:text-lg">
             The template is two artists rapping and dancing in front of one microphone. That video stays
-            the shot. Upload a reference image and a name for each character. The free path recasts their
-            faces onto the performers. With a Fal key, MIGO replaces each performer in that same clip.
+            the shot. Upload a reference image and a name for each character, and MIGO replaces each
+            performer in the first 12 seconds of that same clip.
           </p>
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
             <Link href="/create" className={cn(buttonVariants(), "h-11 px-5")}>

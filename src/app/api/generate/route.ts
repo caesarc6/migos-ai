@@ -1,8 +1,7 @@
-import { CUTOUT_MODEL } from "@/lib/video/cutout";
 import { VideoProviderError } from "@/lib/video/errors";
 import { readJob, startJob } from "@/lib/video/jobs";
 import { FAL_MOTION_MODEL } from "@/lib/video/motion/fal";
-import type { GenerateInput, PerformerInput } from "@/lib/video/provider";
+import { assertMotionConfigured, type GenerateInput, type PerformerInput } from "@/lib/video/provider";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -38,8 +37,7 @@ export async function GET(request: Request) {
         "Cache-Control": "no-store",
         "X-Content-Type-Options": "nosniff",
         "X-Migo-Filename": result.filename,
-        "X-Migo-Model":
-          result.mode === "motion" ? FAL_MOTION_MODEL : result.mode === "recast" ? "inswapper_128" : CUTOUT_MODEL,
+        "X-Migo-Model": FAL_MOTION_MODEL,
         "X-Migo-Mode": result.mode,
       },
     });
@@ -53,6 +51,15 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  try {
+    assertMotionConfigured();
+  } catch (error) {
+    if (error instanceof VideoProviderError) {
+      return Response.json({ error: error.message }, { status: error.status });
+    }
+    throw error;
+  }
+
   let form: FormData;
   try {
     form = await request.formData();

@@ -9,7 +9,8 @@ export const metadata = {
 };
 
 export default function CreatePage() {
-  const motion = (process.env.VIDEO_PROVIDER ?? "mock").trim().toLowerCase() === "fal";
+  const configured =
+    (process.env.VIDEO_PROVIDER ?? "").trim().toLowerCase() === "fal" && Boolean(process.env.FAL_KEY?.trim());
   return (
     <main className="mx-auto w-full max-w-6xl px-4 py-10 sm:px-6 sm:py-14">
       <div className="max-w-2xl">
@@ -18,12 +19,15 @@ export default function CreatePage() {
           Cast the performance
         </h1>
         <p className="mt-4 text-base leading-relaxed text-muted-foreground sm:text-lg">
-          {motion
-            ? "Migos.mp4 stays the shot. Person 1 and Person 2 each replace one performer, one pass at a time, and both are placed back on the original frame. 480p is about $0.04 per second per person for the first 12 seconds."
-            : "Performer 1 and Performer 2 take the place of the two artists in Migos.mp4. Give each a clear face photo and a short name. MIGO keeps that performance’s motion, camera, timing, and audio, and renders your identities onto the two performers. No video API key."}
+          Migos.mp4 stays the shot. Person 1 and Person 2 each replace one performer, one pass at a time, and both
+          are placed back on the original frame. 480p is about $0.04 per second per person for the first 12 seconds.
         </p>
       </div>
-      <Studio hasTemplateVideo={hasTemplateVideo()} templateVersion={templateVideoVersion()} motion={motion} />
+      <Studio
+        hasTemplateVideo={hasTemplateVideo()}
+        templateVersion={templateVideoVersion()}
+        configured={configured}
+      />
     </main>
   );
 }
